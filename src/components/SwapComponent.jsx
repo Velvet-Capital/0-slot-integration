@@ -13,7 +13,7 @@ export default function SwapComponent() {
     const [txSignature, setTxSignature] = useState(null);
 
     // Swap parameters
-    const [swapEndpoint, setSwapEndpoint] = useState('http://localhost:4000/api/v1/route/solana/swap');
+    const [swapEndpoint, setSwapEndpoint] = useState('https://metaagg.velvetdao.xyz/api/v1/route/solana/swap');
     const [oslotEndpoint] = useState('http://de1.0slot.trade/?api-key=a403faee1e7e4d9a81a3907a52cb7952');
     const [inputMint, setInputMint] = useState('So11111111111111111111111111111111111111112'); // SOL
     const [outputMint, setOutputMint] = useState('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC
@@ -92,7 +92,7 @@ export default function SwapComponent() {
                         type="text"
                         value={swapEndpoint}
                         onChange={(e) => setSwapEndpoint(e.target.value)}
-                        placeholder="http://localhost:4000/api/v1/route/solana/swap"
+                        placeholder="https://metaagg.velvetdao.xyz/api/v1/route/solana/swap"
                         disabled={loading}
                     />
                     <small style={{ color: '#666', fontSize: '0.85rem', display: 'block', marginTop: '0.25rem' }}>

@@ -3,11 +3,12 @@ import { Connection, VersionedTransaction } from '@solana/web3.js';
 /**
  * O-SLOT transaction execution utility
  * This function handles the execution of swap transactions using 0slot setup
+ * Uses Connection.sendRawTransaction approach similar to the reference implementation
  * 
  * @param {string} transactionBase64 - Base64 encoded transaction from swap endpoint
- * @param {Connection} connection - Solana connection instance
+ * @param {Connection} connection - Solana connection instance (for blockhash if needed)
  * @param {Function} signTransaction - Wallet sign transaction function
- * @param {string} endpoint - 0slot endpoint for execution (with API key)
+ * @param {string} endpoint - 0slot endpoint for execution (with API key, e.g., https://de.0slot.trade?api-key=...)
  * @returns {Promise<string>} Transaction signature
  */
 export async function executeSwapWithOSlot(
@@ -29,112 +30,37 @@ export async function executeSwapWithOSlot(
         // Sign the transaction with the wallet
         const signedTransaction = await signTransaction(versionedTransaction);
 
-        // Serialize the signed transaction to base64
-        const serializedTx = Buffer.from(signedTransaction.serialize()).toString('base64');
+        // Serialize the signed transaction to buffer (for sendRawTransaction)
+        const serializedTx = signedTransaction.serialize();
 
         const prepareTime = ((performance.now() - prepareStartTime) / 1000).toFixed(5);
         console.log(`⏱️  Transaction preparation took: ${prepareTime} seconds`);
 
-        // Prepare JSON-RPC 2.0 payload for 0slot (matching Python demo format)
-        const payload = {
-            jsonrpc: "2.0",
-            id: 1,
-            method: "sendTransaction",
-            params: [
-                serializedTx,
-                {
-                    encoding: "base64",
-                    skipPreflight: true,
-                    preflightCommitment: "processed",
-                    maxRetries: 0,
-                    minContextSlot: null,
-                },
-            ],
-        };
+        // Create a connection to the 0slot endpoint
+        // Extract API key from endpoint if present, or use endpoint as-is
+        const oslotConnection = new Connection(endpoint, 'confirmed');
 
         // Log request details
         const requestStartTime = performance.now();
         console.log(`📤 Sending transaction to 0slot endpoint: ${endpoint}`);
-        console.log(`📦 Payload size: ${JSON.stringify(payload).length} bytes`);
+        console.log(`📦 Transaction size: ${serializedTx.length} bytes`);
 
-        // Send to 0slot endpoint using JSON-RPC format
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
+        // Send transaction using sendRawTransaction (Connection-based approach)
+        const signature = await oslotConnection.sendRawTransaction(serializedTx, {
+            skipPreflight: true,
+            maxRetries: 0,
         });
 
         const requestTime = ((performance.now() - requestStartTime) / 1000).toFixed(5);
-        console.log(`⏱️  Request sent, waiting for response... (${requestTime} seconds)`);
-
-        const responseStartTime = performance.now();
-
-        if (response.status !== 200) {
-            const errorText = await response.text();
-            const responseTime = ((performance.now() - responseStartTime) / 1000).toFixed(5);
-            const totalTime = ((performance.now() - totalStartTime) / 1000).toFixed(5);
-
-            console.error(`❌ 0slot request failed after ${responseTime} seconds`);
-            console.error(`❌ Total execution time: ${totalTime} seconds`);
-
-            let errorMessage = `0slot execution failed: incorrect status code: ${response.status}`;
-
-            try {
-                const errorData = JSON.parse(errorText);
-                if (errorData.error) {
-                    errorMessage = errorData.error.message || errorData.error.code || errorMessage;
-                } else if (errorData.message) {
-                    errorMessage = errorData.message;
-                }
-            } catch (e) {
-                // If response is not JSON, use the text
-                if (errorText) {
-                    errorMessage = `${errorMessage}, ${errorText}`;
-                }
-            }
-
-            throw new Error(errorMessage);
-        }
-
-        const responseData = await response.json();
-        const responseTime = ((performance.now() - responseStartTime) / 1000).toFixed(5);
         const totalTime = ((performance.now() - totalStartTime) / 1000).toFixed(5);
 
-        // Handle JSON-RPC response format: { result: "signature_string" }
-        if (responseData.result) {
-            const signature = responseData.result;
-            console.log(`✅ Response received in ${responseTime} seconds`);
-            console.log(`⏱️  Total execution time: ${totalTime} seconds`);
-            console.log(`🚀 Transaction signature: ${signature}`);
-            console.log(`✨ It took ${totalTime} seconds to send transaction ${signature} (ZeroSlot)`);
-            console.log(`💡 Note: This is easy to optimize, you just have to be closer to 0slot server`);
+        console.log(`✅ Transaction sent in ${requestTime} seconds`);
+        console.log(`⏱️  Total execution time: ${totalTime} seconds`);
+        console.log(`🚀 Transaction signature: ${signature}`);
+        console.log(`✨ It took ${totalTime} seconds to send transaction ${signature} (ZeroSlot)`);
+        console.log(`💡 Note: This is easy to optimize, you just have to be closer to 0slot server`);
 
-            return signature;
-        } else if (responseData.error) {
-            console.error(`❌ 0slot error response received after ${responseTime} seconds`);
-            console.error(`❌ Total execution time: ${totalTime} seconds`);
-            throw new Error(`0slot error: ${responseData.error.message || JSON.stringify(responseData.error)}`);
-        } else {
-            // Fallback for other response formats
-            if (responseData.signature) {
-                console.log(`✅ Response received in ${responseTime} seconds`);
-                console.log(`⏱️  Total execution time: ${totalTime} seconds`);
-                return responseData.signature;
-            } else if (responseData.txid) {
-                console.log(`✅ Response received in ${responseTime} seconds`);
-                console.log(`⏱️  Total execution time: ${totalTime} seconds`);
-                return responseData.txid;
-            } else if (responseData.txSignature) {
-                console.log(`✅ Response received in ${responseTime} seconds`);
-                console.log(`⏱️  Total execution time: ${totalTime} seconds`);
-                return responseData.txSignature;
-            } else {
-                console.error(`❌ Unexpected response format after ${responseTime} seconds`);
-                throw new Error('Unexpected response format from 0slot endpoint');
-            }
-        }
+        return signature;
     } catch (error) {
         const totalTime = ((performance.now() - totalStartTime) / 1000).toFixed(5);
         console.error(`❌ 0slot execution error after ${totalTime} seconds:`, error);
@@ -153,8 +79,8 @@ export async function executeSwapWithOSlot(
  */
 export async function fetchSwapTransaction(swapEndpoint, swapParams, userPublicKey) {
     try {
-        // Check if this is the custom swap endpoint (localhost:4000 or route/solana/swap)
-        if (swapEndpoint.includes('route/solana/swap') || swapEndpoint.includes('localhost:4000')) {
+        // Check if this is the custom swap endpoint (route/solana/swap or metaagg.velvetdao.xyz)
+        if (swapEndpoint.includes('route/solana/swap') || swapEndpoint.includes('metaagg.velvetdao.xyz')) {
             // Build query parameters for GET request
             const queryParams = new URLSearchParams({
                 tokenIn: swapParams.inputMint,
