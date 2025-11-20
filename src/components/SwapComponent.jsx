@@ -14,7 +14,7 @@ export default function SwapComponent() {
 
     // Swap parameters
     const [swapEndpoint, setSwapEndpoint] = useState('https://metaagg.velvetdao.xyz/api/v1/route/solana/swap');
-    const [oslotEndpoint] = useState('http://de1.0slot.trade/?api-key=a403faee1e7e4d9a81a3907a52cb7952');
+    const [oslotEndpoint] = useState('https://de1.0slot.trade/?api-key=a403faee1e7e4d9a81a3907a52cb7952');
     const [inputMint, setInputMint] = useState('So11111111111111111111111111111111111111112'); // SOL
     const [outputMint, setOutputMint] = useState('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC
     const [amount, setAmount] = useState('');
